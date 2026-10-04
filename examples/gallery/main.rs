@@ -80,6 +80,8 @@ pub fn app_menus() -> Vec<Menu> {
 /// Menu bar and Dock menu, set before the window opens.
 fn menus(cx: &mut App) {
     cx.set_menus(app_menus());
+    // gpui_windows builds the jump list on a pool thread without COM, so it fails.
+    #[cfg(target_os = "macos")]
     cx.set_dock_menu(vec![MenuItem::action("New Window", NewWindow)]);
 }
 

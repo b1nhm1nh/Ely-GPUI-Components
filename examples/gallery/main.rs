@@ -21,6 +21,8 @@ macro_rules! asset {
 }
 
 #[cfg(not(target_family = "wasm"))]
+mod bench;
+#[cfg(not(target_family = "wasm"))]
 mod capture;
 mod pages;
 mod probe;
@@ -155,6 +157,7 @@ struct Args {
     /// The page asked for, which a capture shoots alone.
     page: Option<usize>,
     capture: Option<PathBuf>,
+    bench: Option<PathBuf>,
 }
 
 #[cfg(not(target_family = "wasm"))]
@@ -163,6 +166,7 @@ fn parse_args() -> Result<Args> {
         start: Start::default(),
         page: None,
         capture: None,
+        bench: None,
     };
     let mut iter = std::env::args().skip(1);
     while let Some(flag) = iter.next() {
@@ -175,6 +179,7 @@ fn parse_args() -> Result<Args> {
             }
             "--story" => args.start.story = Some(value.into()),
             "--capture" => args.capture = Some(PathBuf::from(value)),
+            "--bench" => args.bench = Some(PathBuf::from(value)),
             "--narrow" => {
                 args.start.narrow = Some(
                     value
@@ -199,6 +204,7 @@ fn main() -> Result<()> {
         start,
         page,
         capture,
+        bench,
     } = parse_args()?;
     // A script aims across its page; stories hold part.
     let scripted = start.narrow.is_none() && start.story.is_none();
@@ -208,6 +214,8 @@ fn main() -> Result<()> {
             let window = launch(start, cx);
             if let Some(dir) = capture {
                 capture::run(window, dir, page, scripted, cx);
+            } else if let Some(out) = bench {
+                bench::run(window, out, page, cx);
             }
         });
     Ok(())

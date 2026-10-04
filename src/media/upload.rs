@@ -1,8 +1,11 @@
-use std::{path::PathBuf, rc::Rc};
+use std::{
+    path::{Path, PathBuf},
+    rc::Rc,
+};
 
 use gpui::{
     App, ElementId, ImageAssetLoader, ImageSource, IntoElement, ParentElement, RenderOnce,
-    Resource, SharedString, Styled, Window, div, prelude::*,
+    Resource, SharedString, SharedUri, Styled, Window, div, prelude::*,
 };
 
 use super::{Crop, ImageCropper, cropper::OnCrop};
@@ -73,6 +76,16 @@ impl ImageUpload {
     }
 }
 
+/// A web address loads over the network, as the web's pictures do; anything else is a file.
+fn resource(path: &Path) -> Resource {
+    match path.to_str() {
+        Some(text) if text.starts_with("http://") || text.starts_with("https://") => {
+            Resource::Uri(SharedUri::from(text.to_string()))
+        }
+        _ => Resource::Path(path.into()),
+    }
+}
+
 impl RenderOnce for ImageUpload {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let pick = self.on_pick.clone();
@@ -85,8 +98,7 @@ impl RenderOnce for ImageUpload {
                 })
                 .into_any_element();
         };
-        let decoded =
-            window.use_asset::<ImageAssetLoader>(&Resource::Path(path.clone().into()), cx);
+        let decoded = window.use_asset::<ImageAssetLoader>(&resource(&path), cx);
         let told = window.use_keyed_state(
             (self.id.clone(), path.to_string_lossy().into_owned()),
             cx,
@@ -217,5 +229,24 @@ impl RenderOnce for ImageUpload {
                     ),
             )
             .into_any_element()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use gpui::Resource;
+
+    #[test]
+    fn a_web_address_loads_over_the_network() {
+        let web = super::resource(Path::new("https://ely.dev/assets/dunes.jpg"));
+        assert!(
+            matches!(web, Resource::Uri(uri) if uri.as_ref() == "https://ely.dev/assets/dunes.jpg")
+        );
+        assert!(matches!(
+            super::resource(Path::new("/tmp/dunes.jpg")),
+            Resource::Path(_)
+        ));
     }
 }

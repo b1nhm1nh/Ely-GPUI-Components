@@ -22,11 +22,23 @@ use crate::{
 /// A build's output as a terminal printed it, colors and all.
 const BUILD: &str = "\x1b[1;32m   Compiling\x1b[0m ely-gpui-component v0.1.0\r\n\x1b[1;33mwarning\x1b[0m\x1b[1m: unused variable: `spare`\x1b[0m\r\n  \x1b[1;34m-->\x1b[0m src/main.rs:47:9\r\n\x1b[1;33mwarning\x1b[0m\x1b[1m: field `hint` is never read\x1b[0m\r\n  \x1b[1;34m-->\x1b[0m src/palette.rs:12:5\r\n\x1b[1;32m    Finished\x1b[0m `dev` profile [unoptimized + debuginfo] target(s) in 4.21s\r\n\x1b[1;32m     Running\x1b[0m `target/debug/palette`\r\n\x1b[38;5;110m◆\x1b[0m 5 tints of accent, the last \x1b[38;2;232;243;252m██\x1b[0m #e8f3fc\r\n\x1b[2mdocs: https://github.com/leidianyayi/Ely-GPUI-Components\x1b[0m\r\n";
 
+#[cfg(not(windows))]
 const SHELLS: [(&str, &str); 3] = [
     ("bash", "/bin/bash"),
     ("zsh", "/bin/zsh"),
     ("sh", "/bin/sh"),
 ];
+
+#[cfg(windows)]
+const SHELLS: [(&str, &str); 3] = [
+    ("pwsh", "pwsh.exe"),
+    ("powershell", "powershell.exe"),
+    ("cmd", "cmd.exe"),
+];
+
+/// PowerShell's prompt: the folder's name, as the Unix shells show it.
+#[cfg(windows)]
+const PS_PROMPT: &str = "function prompt { (Split-Path -Leaf $PWD) + ' › ' }";
 
 /// A shell with no startup files, its prompt the folder's name, in this repository.
 fn launch(shell: usize) -> Launch {
@@ -34,6 +46,12 @@ fn launch(shell: usize) -> Launch {
     let args = match name {
         "bash" => vec!["--noprofile".into(), "--norc".into(), "-i".into()],
         "zsh" => vec!["-f".into(), "-i".into()],
+        #[cfg(windows)]
+        "pwsh" | "powershell" => ["-NoLogo", "-NoProfile", "-NoExit", "-Command", PS_PROMPT]
+            .map(String::from)
+            .to_vec(),
+        #[cfg(windows)]
+        "cmd" => ["/Q", "/K", "prompt $P $G"].map(String::from).to_vec(),
         _ => vec!["-i".into()],
     };
     Launch {

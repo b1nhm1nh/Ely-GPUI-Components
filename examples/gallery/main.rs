@@ -20,7 +20,6 @@ macro_rules! asset {
     };
 }
 
-#[cfg(not(target_family = "wasm"))]
 mod bench;
 #[cfg(not(target_family = "wasm"))]
 mod capture;
@@ -113,6 +112,9 @@ pub struct Start {
     pub narrow: Option<f32>,
     /// Why the start could not be read, shown instead.
     pub failure: Option<SharedString>,
+    /// Time the pages on the web (`?bench`).
+    #[cfg_attr(not(target_family = "wasm"), allow(dead_code))]
+    pub bench: bool,
 }
 
 /// Sets Ely up and opens the gallery's window.
@@ -215,7 +217,19 @@ fn main() -> Result<()> {
             if let Some(dir) = capture {
                 capture::run(window, dir, page, scripted, cx);
             } else if let Some(out) = bench {
-                bench::run(window, out, page, cx);
+                let report: bench::Report = Box::new(move |table, cx| {
+                    match table.and_then(|csv| {
+                        std::fs::write(&out, csv)
+                            .with_context(|| format!("write {}", out.display()))
+                    }) {
+                        Ok(()) => cx.quit(),
+                        Err(error) => {
+                            log::error!("bench failed: {error:#}");
+                            std::process::exit(1);
+                        }
+                    }
+                });
+                bench::run(window, page, report, cx);
             }
         });
     Ok(())

@@ -1,6 +1,6 @@
-use std::{fmt::Write as _, path::PathBuf, time::Duration};
+use std::{fmt::Write as _, time::Duration};
 
-use anyhow::{Context as _, Result, bail};
+use anyhow::{Result, bail};
 use futures::future::{Either, select};
 use gpui::{App, AsyncApp, WindowHandle, px};
 use web_time::Instant;
@@ -12,14 +12,14 @@ const STEP: f32 = 60.0;
 const SETTLE: Duration = Duration::from_millis(500);
 const LATE: Duration = Duration::from_secs(5);
 
-/// Times each page's switch and its scroll, frame by frame, then quits.
-pub fn run(window: WindowHandle<Gallery>, out: PathBuf, only: Option<usize>, cx: &mut App) {
+/// Where the table goes: a file natively, the page on the web.
+pub type Report = Box<dyn FnOnce(Result<String>, &mut App)>;
+
+/// Times each page's switch and its scroll, frame by frame, and hands the table to `report`.
+pub fn run(window: WindowHandle<Gallery>, only: Option<usize>, report: Report, cx: &mut App) {
     cx.spawn(async move |cx| {
-        let outcome = bench_all(window, &out, only, cx).await;
-        if let Err(error) = outcome.map(|()| cx.update(|cx| cx.quit())) {
-            log::error!("bench failed: {error:#}");
-            std::process::exit(1);
-        }
+        let table = bench_all(window, only, cx).await;
+        cx.update(|cx| report(table, cx));
     })
     .detach();
 }
@@ -43,10 +43,9 @@ fn ms(duration: Duration) -> f64 {
 
 async fn bench_all(
     window: WindowHandle<Gallery>,
-    out: &std::path::Path,
     only: Option<usize>,
     cx: &mut AsyncApp,
-) -> Result<()> {
+) -> Result<String> {
     let mut csv =
         String::from("page,switch_ms,frames,avg_ms,p95_ms,worst_ms,over_25ms,over_50ms\n");
     for (ix, page) in pages::ALL.iter().enumerate() {
@@ -99,5 +98,5 @@ async fn bench_all(
             over(50.0)
         )?;
     }
-    std::fs::write(out, csv).with_context(|| format!("write {}", out.display()))
+    Ok(csv)
 }

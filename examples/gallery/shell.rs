@@ -74,7 +74,6 @@ impl Gallery {
     }
 
     /// Viewport height and furthest scroll, in pixels.
-    #[cfg(not(target_family = "wasm"))]
     pub fn scroll_extent(&self) -> (Pixels, Pixels) {
         (self.scroll.bounds().size.height, self.scroll.max_offset().y)
     }
@@ -95,7 +94,6 @@ impl Gallery {
         true
     }
 
-    #[cfg(not(target_family = "wasm"))]
     pub fn scroll_to(&mut self, y: Pixels, cx: &mut Context<Self>) {
         self.scroll.set_offset(point(px(0.0), -y));
         cx.notify();

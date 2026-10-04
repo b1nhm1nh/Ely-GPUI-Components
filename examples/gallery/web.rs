@@ -63,7 +63,10 @@ fn read(search: &str) -> Result<Start> {
             }
             "story" => start.story = Some(value.into()),
             "theme" => start.choice = choice(&value)?,
-            other => bail!("unknown parameter {other}; the gallery reads page, story and theme"),
+            "bench" => start.bench = true,
+            other => {
+                bail!("unknown parameter {other}; the gallery reads page, story, theme and bench")
+            }
         }
     }
     if start.story.is_some() && params.get("page").is_none() {
@@ -105,9 +108,30 @@ pub fn start() {
             if let Some(choice) = EARLY.take() {
                 start.choice = choice;
             }
+            let (bench, only) = (start.bench, params_page(&search));
             let window = launch(start, cx);
+            if bench {
+                crate::bench::run(window, only, Box::new(publish), cx);
+            }
             HOST.with(|host| *host.borrow_mut() = Some((cx.to_async(), window)));
         });
+}
+
+/// The page asked for, which a bench times alone.
+fn params_page(search: &str) -> Option<usize> {
+    let page = UrlSearchParams::new_with_str(search).ok()?.get("page")?;
+    pages::find(&page)
+}
+
+/// Leaves the bench's table on `window.elyBench`, or its failure on `window.elyBenchError`.
+fn publish(table: Result<String>, _: &mut gpui::App) {
+    let (key, value) = match table {
+        Ok(csv) => ("elyBench", csv),
+        Err(error) => ("elyBenchError", format!("{error:#}")),
+    };
+    log::info!("bench: {key} set");
+    let global = web_sys::window().expect("a browser window");
+    js_sys::Reflect::set(&global, &key.into(), &value.into()).expect("the window takes a property");
 }
 
 /// Sets Ely's mode from the host, even before opening.
